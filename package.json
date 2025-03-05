@@ -1,0 +1,46 @@
+{
+  "name": "signalk-deadreckoner",
+  "version": "1.0.0",
+  "description": "Plugin that creates a shadow AIS target that continues based on dead reckoning",
+  "main": "index.js",
+  "scripts": {
+    "test": "$NODE $npm_package_main",
+    "create-release": "github-create-release --owner marcobergman --repository signalk-deadreckoner",
+    "release": "git tag -d v$npm_package_version; git tag v$npm_package_version && git push --tags && git push && npm run create-release",
+    "prettier": "prettier -w index.js",
+    "lint": "eslint -c .eslintrc.js --ext .ts --ext .js --fix index.js",
+    "format": "npm run prettier && npm run lint"
+  },
+  "keywords": [
+    "signalk-node-server-plugin",
+    "signalk-webapp"
+  ],
+  "signalk-plugin-enabled-by-default": false,
+  "signalk": {
+    "appIcon": "images/deadreckoner.png",
+    "displayName": "Dead Reckoner"
+  },
+  "author": {
+    "name": "Marco Bergman",
+    "email": "marcobergman@gmail.com"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "baconjs": "^0.7.88",
+    "fast-csv": "^5.0.2",
+    "geolib": "^3.3.3",
+    "lodash": "^4.17.4"
+  },
+  "devDependencies": {
+    "@signalk/github-create-release": "^1.0.1",
+    "eslint": "^8.24.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prefer-arrow": "^1.2.3",
+    "eslint-plugin-react": "^7.31.8",
+    "prettier": "^2.7.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marcobergman/signalk-deadreckoner"
+  }
+}
