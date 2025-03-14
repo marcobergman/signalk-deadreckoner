@@ -792,11 +792,12 @@ module.exports = function (app) {
 
     router.get('/getEP', (req, res) => {
 	  vesselPosition = app.getSelfPath('navigation.position.value')
-	  res.json(calculateBoatCurrent(vesselPosition))
+	  res.json(vesselPosition)
     })
 
     router.get('/getCurrent', (req, res) => {
-      res.json({direction: 270, speed: 1})
+      var current = calculateBoatCurrent(vesselPosition);
+      res.json({ "direction" : current.phi, "speed" : current.r })
     })
 
     router.get('/getDrift', (req, res) => {
@@ -844,18 +845,24 @@ module.exports = function (app) {
 	}
 
 
+	function round(i) {
+		return Math.round(i*100)/100;
+	}
+
+
 	function findHoursToHW (station) {
 		for (let i = 0; i < tides.length; i++) {
 			entry = tides[i]
 			if (entry.station == station) {
 				diff = - timeDiff (entry.date + entry.time)
 				if (Math.abs(diff) <= 6.5) {
-					app.debug("High Water", station, entry.date + " " + entry.time, "now", diff, "hours ago")
+					app.debug("High Water", station, entry.date + " " + entry.time, "now", round(diff), "hours ago")
 					return (diff)
 				}
 			}
 		}
 	}
+
 
 	function getSpringNeapFactor (today) {
 		// calculate factor: 0 = at Spring, 1 = at Neap
@@ -865,13 +872,9 @@ module.exports = function (app) {
 		periodsAfterFirstSpring = daysAfterFirstSpring / springPeriod;
 		periodsAfterLatestSpring = periodsAfterFirstSpring - Math.floor(periodsAfterFirstSpring);
 		if (periodsAfterLatestSpring > 0.5) {periodsAfterLatestSpring = periodsAfterLatestSpring - 1}
-		//app.debug ("periodAfterLatestSpring", periodsAfterLatestSpring);
-		return (periodsAfterLatestSpring);
-	}
-
-
-	function round(i) {
-		return Math.round(i*1000)/1000;
+		var springNeapFactor = Math.abs(periodsAfterLatestSpring)
+		app.debug ("springNeapFactor", round(springNeapFactor));
+		return (springNeapFactor);
 	}
 
 
@@ -903,7 +906,7 @@ module.exports = function (app) {
 
 	function calculateDiamondCurrent (diamond, springNeapFactor, i_diff) {
 		app.debug ("----------------------");
-		app.debug ("calculateDiamondCurrent (", diamond.reference, springNeapFactor, i_diff, ")")
+		app.debug ("calculateDiamondCurrent (", diamond.reference, ")")
 		diff = findHoursToHW (diamond.reference);
 		//diff = i_diff; //temporary
 		floor = Math.floor(diff)
@@ -949,8 +952,6 @@ module.exports = function (app) {
 			distanceToDiamond = calc_distance (
 				vesselPosition.latitude, vesselPosition.longitude,
 				diamonds[k].position.latitude, diamonds[k].position.longitude);
-			app.debug(i, vesselPosition, diamonds[k].position, diamonds[k].reference, 
-				Math.round(distanceToDiamond/1852, 3), k)
 			if (distanceToDiamond < minimalDistance && distanceToDiamond > chosenDistance) {
 				nearestDiamond = k
 				minimalDistance = distanceToDiamond
@@ -958,6 +959,7 @@ module.exports = function (app) {
 		}
 		chosenDistance = minimalDistance
 		chosenDiamonds.push({"diamond": nearestDiamond, "distance": minimalDistance/1852}) 
+		app.debug (diamonds[nearestDiamond].reference)
 		// just an array of indexes into diamonds, augmented with distances
 	  }
 	  
@@ -972,7 +974,7 @@ module.exports = function (app) {
 		  distance = chosenDiamonds[j].distance
 		  let {speed, direction} = calculateDiamondCurrent(diamond, springNeapFactor, 0);
 		  thisCurrent = new PolarVector(speed, direction);
-		  app.debug(diamond.reference, "thisCurrent", thisCurrent.toString(), "distance", distance)
+		  app.debug(diamond.reference, "thisCurrent", thisCurrent.toString(), "distance", round(distance), "NM")
 		  
 		  weighingFactor = 1 / distance;
 

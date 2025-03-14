@@ -154,6 +154,14 @@
             <span id='depthValue'>-</span> m
           </div>
         </td>
+        <td style="width: 30%;">
+          <div class="heading">
+            Current
+          </div>
+          <div class="value">
+            <span id='currentValue'></span>
+          </div>
+        </td>
       </tr>
     </table>
  </div>
@@ -219,6 +227,7 @@
       radius = Math.round(radius*10)/10;
       $('#radiusValue').html(radius);
     });
+
     $.get('/signalk/v1/api/vessels/self/environment/depth/belowKeel/value', (depth) => {
       depth = Math.round(depth*10)/10;
       $('#depthValue').html(depth);
@@ -290,7 +299,8 @@
       }
     });
 	
-	updateEP();
+    updateEP();
+    updateCurrent();
 	
   }, 1500);
 
@@ -480,6 +490,13 @@
   function updateEP() {
     $.getJSON('/plugins/deadreckoner/getEP', (data) => {
       console.log ("EP latlon = ", data)
+    });
+  }
+
+  function updateCurrent() {
+    $.getJSON('/plugins/deadreckoner/getCurrent', (current) => {
+      console.log ("Current =", current)
+      $('#currentValue').html((0.0 + current.direction).toFixed(0)+'/'+(0.0 + current.speed).toFixed(1));
     });
   }
 
