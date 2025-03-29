@@ -59,11 +59,11 @@
         top: 60px;
         left: 50%;
         padding: 5px;
-        width: 300px;
+        width: 400px;
         margin-left: -150px;
         height: 58px;
         overflow: none;
-        background-color: #fff;
+        background-color: black;
         border-radius: 10px;
         border: 1px solid #888;
         overflow-x: hidden;
@@ -74,7 +74,6 @@
       #info .heading {
         font-weight: bold;
         text-align: center;
-        color: navy;
         font-size: 14pt;
       }
 
@@ -130,36 +129,44 @@
   <div id="info">
     <table style="width: 100%">
       <tr>
-        <td style="width: 35%;">
+        <td style="width: 23%; color: DarkOrange">
           <div class="heading">
-            Distance
+            <span>Boat</span>
           </div>
           <div class="value">
-            <span id='radiusValue'>-</span> m
+            <span id='boatValue'>-</span>
           </div>
         </td>
-        <td style="width: 35%;">
+        <td style="width: 15%; color: red">
           <div class="heading">
-            Limit
+            Heel
           </div>
           <div class="value">
-            <span id='radius'>-</span> m
+            <span id='heelValue'>-</span>°
           </div>
         </td>
-        <td style="width: 30%;">
+        <td style="width: 15%; color: Yellow">
           <div class="heading">
-            Depth
+            Drift
           </div>
           <div class="value">
-            <span id='depthValue'>-</span> m
+            <span id='driftValue'>-</span>°
           </div>
         </td>
-        <td style="width: 30%;">
+        <td style="width: 23%; color: DeepPink">
           <div class="heading">
             Current
           </div>
           <div class="value">
-            <span id='currentValue'></span>
+            <span id='currentValue'>-</span>
+          </div>
+        </td>
+        <td style="width: 23%; color: Green">
+          <div class="heading">
+            Ground
+          </div>
+          <div class="value">
+            <span id='groundValue'>-</span>
           </div>
         </td>
       </tr>
@@ -167,7 +174,7 @@
  </div>
 <script>
   var boat;
-  var EP; //Estimated Position
+  var EPMarker;
   var anchor;
   var anchorRadius;
   var mmsi;
@@ -177,6 +184,16 @@
   var target = {};
   var track;
   var trackUpdater;
+  var position;
+  var heading;
+  var speed;
+  var drift;
+  var EP; //Estimated Position
+  var current;
+  var boatVector;
+  var driftVector;
+  var currentVector;
+  var resultVector;
 
   // Check if we have an authenticated session first, if not, we will redirect
   // getTrack will return 401 if the session is not authenticated
@@ -205,23 +222,116 @@
 
   var urlParams = new URLSearchParams(window.location.search);
 
+  let bounds;
+
   setInterval( () => {
+    // get boat position, speed and heading
     $.get('/signalk/v1/api/vessels/self/navigation', (data) => {
-      latitude = data.position.value.latitude;
-      longitude = data.position.value.longitude;
-      let heading = data.headingTrue?.value;
+      position = data.position.value
+      heading = data.headingTrue?.value;
       if (heading) {
         heading = heading *  57.295779513; // Convert to degrees
       } else {
         heading = 0;
       }
-      let latlng = L.latLng(latitude, longitude);
+      let latlng = L.latLng(position.latitude, position.longitude);
       boat.setLatLng(latlng); 
       boat.setRotationAngle(heading);
+
       if (track) {
         track.addLatLng(latlng);
       }
+
+      speed = data.speedThroughWater?.value
+      if (speed) {
+          speed = speed * 3600 / 1852; // knots
+      } 
+      $('#boatValue').html((0.0 + heading).toFixed(0)+'/'+(0.0 + speed).toFixed(1));
     });
+
+    // get estimated position
+    $.getJSON('/plugins/deadreckoner/getEP', (data) => {
+      EP = data;
+      let latlng = L.latLng(EP.latitude, EP.longitude);
+      EPMarker.setLatLng(latlng);
+       bounds = L.polyline([latlng]);
+    });
+
+    // get current
+    $.getJSON('/plugins/deadreckoner/getCurrent', (data) => {
+      current = data;
+      $('#currentValue').html((0.0 + current.direction).toFixed(0)+'/'+(0.0 + current.speed).toFixed(1));
+    }); 
+
+    // get heel
+    $.getJSON('/plugins/deadreckoner/getHeel', (data) => {
+      heel = data.heel;
+      $('#heelValue').html((0.0 + heel).toFixed(0));
+    }); 
+
+    // get drift
+    $.getJSON('/plugins/deadreckoner/getDrift', (data) => {
+      drift = data.drift;
+      $('#driftValue').html((0.0 + drift).toFixed(0));
+    }); 
+
+    hourPart = 1;
+    d2r = Math.PI/180;
+
+    // draw boat vector
+    if (speed) {
+        epLat = EP.latitude;
+        epLng = EP.longitude;
+        deltaLat = speed * hourPart * Math.cos(heading * d2r) / 60;
+        deltaLng = speed * hourPart * Math.sin(heading * d2r) / Math.cos(epLat * d2r) / 60;
+        line = [[epLat, epLng], [epLat + deltaLat, epLng + deltaLng]];
+        if (boatVector) {
+		boatVector.setLatLngs(line);
+	} else {
+		boatVector = L.polyline(line, {color: 'DarkOrange', opacity: 1}).addTo(map);
+        }
+      if (bounds) {
+         bounds.addLatLng({"lat": epLat + deltaLat, "lng": epLng + deltaLng});
+	 map.fitBounds(bounds.getBounds());
+      }
+    }
+
+    var lat, lng;
+    // draw drift vector
+    if (speed && drift) {
+        deltaLat = speed * hourPart * Math.cos((heading + drift) * d2r) / 60;
+        deltaLng = speed * hourPart * Math.sin((heading + drift) * d2r) / Math.cos(epLat * d2r) / 60;
+        line = [[epLat, epLng], [epLat + deltaLat, epLng + deltaLng]];
+        if (driftVector) {
+		driftVector.setLatLngs(line);
+	} else {
+		driftVector = L.polyline(line, {color: 'Yellow', opacity: 1}).addTo(map);
+        }
+    }
+
+    // draw current vector
+    if (speed && drift && current) {
+        lat = epLat + deltaLat;
+        lng = epLng + deltaLng;
+        deltaLat = current.speed * hourPart * Math.cos(current.direction * d2r) / 60;
+        deltaLng = current.speed * hourPart * Math.sin(current.direction * d2r) / Math.cos(epLat * d2r) / 60;
+        line = [[lat, lng], [lat + deltaLat, lng + deltaLng]];
+        if (currentVector) {
+		currentVector.setLatLngs(line);
+	} else {
+		currentVector = L.polyline(line, {color: 'DeepPink', opacity: 1}).addTo(map);
+        }
+    }
+
+    // draw resulting  vector
+    if (speed && drift && current) {
+        line = [[epLat, epLng], [lat + deltaLat, lng + deltaLng]];
+        if (resultVector) {
+		resultVector.setLatLngs(line);
+	} else {
+		resultVector = L.polyline(line, {color: 'Green', opacity: 1}).addTo(map);
+        }
+    }
 
     $.get('/signalk/v1/api/vessels/self/navigation/anchor/distanceFromBow/value', (radius) => {
       radius = Math.round(radius*10)/10;
@@ -299,11 +409,9 @@
       }
     });
 	
-    updateEP();
-    updateCurrent();
-	
   }, 1500);
 
+  // Initial setup of icons etc.
   $.get('/signalk/v1/api/vessels/self', (data) => {
       mmsi = data.mmsi;
       let vesselType = data.design?.aisShipType?.value?.name;
@@ -317,12 +425,13 @@
         heading = 0;
       }
       let latlng = L.latLng(latitude, longitude);
-      let latlng2 = L.latLng(latitude+0.001, longitude+0.001);
       zoom = 17;
       if (urlParams.has('zoom')) {
         zoom = urlParams.get('zoom');
       }
       map.setView(latlng, zoom);
+      
+      // Set boat icon
       let boatIcon = L.icon({
         iconUrl: vesselType === 'Sailing' ? 'images/sailboat.png' : 'images/powerboat.png',
         iconSize:     [24, 48], // size of the icon
@@ -334,19 +443,19 @@
           icon: boatIcon
       }).addTo(map)
 	  
+      // Set EP icon
       let EPIcon = L.icon({
         iconUrl: 'images/estimatedposition.png',
         iconSize:     [24, 48], // size of the icon
         iconAnchor:   [12, 24], // point of the icon which will correspond to marker's location
       });
 	  
-      EP = L.marker(latlng2, {
+      EPMarker = L.marker(latlng, {
           rotationAngle: heading,
           icon: EPIcon
       }).addTo(map)
-	  
 
-      if ((data.anchor) && (data.anchor.position) && (data.anchor.position.value)) {
+    if ((data.anchor) && (data.anchor.position) && (data.anchor.position.value)) {
         let anchorPosition = data.anchor.position.value;	
         let radius = data.anchor.maxRadius.value;
 	      dropAnchor(anchorPosition, radius);
@@ -432,7 +541,7 @@
     });
   });
 
-  $('#setRadius').click( () => {
+  $('#heelValue').click( () => {
     $.get('/signalk/v1/api/vessels/self/navigation/anchor/maxRadius/value', (radius) => {
       let newRadius = prompt('Enter Radius (m)', radius)
       if (newRadius) {
@@ -488,16 +597,6 @@
   }
 
   function updateEP() {
-    $.getJSON('/plugins/deadreckoner/getEP', (data) => {
-      console.log ("EP latlon = ", data)
-    });
-  }
-
-  function updateCurrent() {
-    $.getJSON('/plugins/deadreckoner/getCurrent', (current) => {
-      console.log ("Current =", current)
-      $('#currentValue').html((0.0 + current.direction).toFixed(0)+'/'+(0.0 + current.speed).toFixed(1));
-    });
   }
 
   function dropAnchor(position, radius) {

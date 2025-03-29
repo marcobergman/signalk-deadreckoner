@@ -792,7 +792,15 @@ module.exports = function (app) {
 
     router.get('/getEP', (req, res) => {
 	  vesselPosition = app.getSelfPath('navigation.position.value')
-	  res.json(vesselPosition)
+	  res.json({"latitude": vesselPosition.latitude - 0.001, "longitude": vesselPosition.longitude - 0.001})
+    })
+
+    router.get('/getHeel', (req, res) => {
+	  res.json({"heel": 9})
+    })
+
+    router.get('/getDrift', (req, res) => {
+	  res.json({"drift": 5})
     })
 
     router.get('/getCurrent', (req, res) => {
@@ -913,7 +921,7 @@ module.exports = function (app) {
 		index1 = floor + 6;
 		index2 = floor + 7;
 		if (index1 < 0) index1=12;
-		if (index1 > 12) index1=0;
+		if (index2 > 12) index2=0;
 		app.debug("- Floor =", floor, "index1 =", index1, "index2 =", index2)
 		lowerDirection = diamond.entries[index1].direction
 		higherDirection = diamond.entries[index2].direction
